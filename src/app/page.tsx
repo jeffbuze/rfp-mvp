@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 interface RFPData {
   title: string;
@@ -8,84 +8,134 @@ interface RFPData {
   requirements: Array<{ text: string; category: string }>;
 }
 
+interface BidData {
+  title: string;
+  rawText: string;
+  requirements: Array<{
+    text: string;
+    category: string;
+    isSatisfied: boolean;
+    reason: string;
+  }>;
+}
+
+const STORAGE_KEY = "rfp-bid-project";
+
 export default function Home() {
-  const [file, setFile] = useState<File | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // RFP state
+  const [rfpFile, setRfpFile] = useState<File | null>(null);
+  const [isRfpDragging, setIsRfpDragging] = useState(false);
+  const [isRfpUploading, setIsRfpUploading] = useState(false);
   const [rfpData, setRfpData] = useState<RFPData | null>(null);
 
+  // Bid state
+  const [bidFile, setBidFile] = useState<File | null>(null);
+  const [isBidDragging, setIsBidDragging] = useState(false);
+  const [isBidUploading, setIsBidUploading] = useState(false);
+  const [bids, setBids] = useState<BidData[]>([]);
+  const [expandedBidIndex, setExpandedBidIndex] = useState<number | null>(null);
+
+  // Error state
+  const [error, setError] = useState<string | null>(null);
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        const data = JSON.parse(stored);
+        if (data.rfpData) setRfpData(data.rfpData);
+        if (data.bids) setBids(data.bids);
+      } catch (err) {
+        console.error("Failed to load stored data:", err);
+      }
+    }
+  }, []);
+
+  // Save to localStorage when data changes
+  useEffect(() => {
+    if (rfpData || bids.length > 0) {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ rfpData, bids })
+      );
+    }
+  }, [rfpData, bids]);
+
   const validateFile = (fileToValidate: File): string | null => {
-    // Check file type
     if (fileToValidate.type !== "application/pdf") {
       return "Please upload a PDF file";
     }
-
-    // Check file size (10MB max)
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (fileToValidate.size > maxSize) {
       return "File size must be less than 10MB";
     }
-
     return null;
   };
 
-  const handleFileSelect = useCallback((selectedFile: File) => {
+  const handleStartNewProject = () => {
+    setRfpFile(null);
+    setRfpData(null);
+    setBidFile(null);
+    setBids([]);
+    setExpandedBidIndex(null);
+    setError(null);
+    localStorage.removeItem(STORAGE_KEY);
+  };
+
+  // RFP handlers
+  const handleRfpFileSelect = useCallback((selectedFile: File) => {
     const validationError = validateFile(selectedFile);
     if (validationError) {
       setError(validationError);
-      setFile(null);
+      setRfpFile(null);
       return;
     }
-
     setError(null);
-    setFile(selectedFile);
-    setRfpData(null);
+    setRfpFile(selectedFile);
   }, []);
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
+  const handleRfpDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragging(true);
+    setIsRfpDragging(true);
   }, []);
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
+  const handleRfpDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragging(false);
+    setIsRfpDragging(false);
   }, []);
 
-  const handleDrop = useCallback(
+  const handleRfpDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      setIsDragging(false);
-
+      setIsRfpDragging(false);
       const droppedFile = e.dataTransfer.files[0];
       if (droppedFile) {
-        handleFileSelect(droppedFile);
+        handleRfpFileSelect(droppedFile);
       }
     },
-    [handleFileSelect]
+    [handleRfpFileSelect]
   );
 
-  const handleFileInputChange = useCallback(
+  const handleRfpFileInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const selectedFile = e.target.files?.[0];
       if (selectedFile) {
-        handleFileSelect(selectedFile);
+        handleRfpFileSelect(selectedFile);
       }
     },
-    [handleFileSelect]
+    [handleRfpFileSelect]
   );
 
-  const handleUpload = async () => {
-    if (!file) return;
+  const handleRfpUpload = async () => {
+    if (!rfpFile) return;
 
-    setIsUploading(true);
+    setIsRfpUploading(true);
     setError(null);
-    setRfpData(null);
 
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", rfpFile);
 
       const response = await fetch("/api/process-rfp", {
         method: "POST",
@@ -99,12 +149,90 @@ export default function Home() {
 
       const data = await response.json();
       setRfpData(data.output);
+      setRfpFile(null);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "An unexpected error occurred"
       );
     } finally {
-      setIsUploading(false);
+      setIsRfpUploading(false);
+    }
+  };
+
+  // Bid handlers
+  const handleBidFileSelect = useCallback((selectedFile: File) => {
+    const validationError = validateFile(selectedFile);
+    if (validationError) {
+      setError(validationError);
+      setBidFile(null);
+      return;
+    }
+    setError(null);
+    setBidFile(selectedFile);
+  }, []);
+
+  const handleBidDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsBidDragging(true);
+  }, []);
+
+  const handleBidDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsBidDragging(false);
+  }, []);
+
+  const handleBidDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsBidDragging(false);
+      const droppedFile = e.dataTransfer.files[0];
+      if (droppedFile) {
+        handleBidFileSelect(droppedFile);
+      }
+    },
+    [handleBidFileSelect]
+  );
+
+  const handleBidFileInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const selectedFile = e.target.files?.[0];
+      if (selectedFile) {
+        handleBidFileSelect(selectedFile);
+      }
+    },
+    [handleBidFileSelect]
+  );
+
+  const handleBidUpload = async () => {
+    if (!bidFile || !rfpData) return;
+
+    setIsBidUploading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", bidFile);
+      formData.append("requirements", JSON.stringify(rfpData.requirements));
+
+      const response = await fetch("/api/process-bid", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to process bid");
+      }
+
+      const data = await response.json();
+      setBids((prev) => [...prev, data.output]);
+      setBidFile(null);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "An unexpected error occurred"
+      );
+    } finally {
+      setIsBidUploading(false);
     }
   };
 
@@ -120,150 +248,382 @@ export default function Home() {
     }, {} as Record<string, string[]>);
   };
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-4xl flex-col gap-8 py-16 px-8 sm:px-16">
-        <div className="text-center">
-          <h1 className="text-4xl font-semibold leading-tight tracking-tight text-black dark:text-zinc-50">
-            RFP Extraction Tool
-          </h1>
-          <p className="mt-4 text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Upload a PDF RFP document to extract key information automatically
-          </p>
-        </div>
+  const getSatisfactionSummary = (bid: BidData) => {
+    const satisfied = bid.requirements.filter((r) => r.isSatisfied).length;
+    const total = bid.requirements.length;
+    return { satisfied, total };
+  };
 
-        {/* File Upload Area */}
-        <div
-          className={`relative rounded-lg border-2 border-dashed p-12 transition-colors ${
-            isDragging
-              ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
-              : "border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-900"
-          }`}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
-          <input
-            type="file"
-            id="file-upload"
-            accept=".pdf,application/pdf"
-            onChange={handleFileInputChange}
-            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-            disabled={isUploading}
-          />
-          <div className="flex flex-col items-center gap-4">
-            <svg
-              className="h-12 w-12 text-zinc-400 dark:text-zinc-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-              />
-            </svg>
-            <div className="text-center">
-              <p className="text-lg font-medium text-zinc-900 dark:text-zinc-100">
-                {file ? file.name : "Drag and drop a PDF file here"}
-              </p>
-              <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                or click to browse (Max 10MB)
-              </p>
-            </div>
+  return (
+    <div className="min-h-screen bg-zinc-50 font-sans dark:bg-black">
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-semibold leading-tight tracking-tight text-black dark:text-zinc-50">
+              RFP Bid Assessment Tool
+            </h1>
+            <p className="mt-2 text-lg text-zinc-600 dark:text-zinc-400">
+              Upload an RFP and assess multiple bids against its requirements
+            </p>
           </div>
+          {(rfpData || bids.length > 0) && (
+            <button
+              onClick={handleStartNewProject}
+              className="rounded-lg bg-zinc-900 px-4 py-2 font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            >
+              Start New Project
+            </button>
+          )}
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-950/20 dark:text-red-400">
+          <div className="mb-6 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-950/20 dark:text-red-400">
             <p className="font-medium">Error: {error}</p>
           </div>
         )}
 
-        {/* Upload Button */}
-        {file && !isUploading && (
-          <button
-            onClick={handleUpload}
-            className="w-full rounded-lg bg-zinc-900 px-6 py-3 font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
-          >
-            Extract RFP Data
-          </button>
-        )}
-
-        {/* Loading State */}
-        {isUploading && (
-          <div className="flex flex-col items-center gap-4 rounded-lg bg-zinc-100 p-8 dark:bg-zinc-800">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-300 border-t-zinc-900 dark:border-zinc-600 dark:border-t-zinc-200"></div>
-            <p className="text-zinc-600 dark:text-zinc-400">
-              Processing PDF and extracting RFP data...
-            </p>
-          </div>
-        )}
-
-        {/* Results Display */}
-        {rfpData && (
-          <div className="space-y-6 rounded-lg border border-zinc-200 bg-white p-8 dark:border-zinc-700 dark:bg-zinc-900">
-            <h2 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-              Extracted RFP Information
-            </h2>
-
+        {/* Split Layout */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+          {/* Left Column - RFP (40%) */}
+          <div className="lg:col-span-2">
             <div className="space-y-6">
-              {/* Title */}
-              <div>
-                <h3 className="text-sm font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                  Title
-                </h3>
-                <p className="mt-2 text-lg text-zinc-900 dark:text-zinc-50">
-                  {rfpData.title}
-                </p>
-              </div>
+              <h2 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+                RFP
+              </h2>
 
-              {/* Raw Text */}
-              <div>
-                <h3 className="text-sm font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                  Raw Text
-                </h3>
-                <p className="mt-2 whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
-                  {rfpData.rawText}
-                </p>
-              </div>
-
-              {/* Requirements */}
-              <div>
-                <h3 className="text-sm font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                  Requirements
-                </h3>
-                <div className="mt-4 space-y-6">
-                  {Object.entries(
-                    groupRequirementsByCategory(rfpData.requirements)
-                  ).map(([category, texts]) => (
-                    <div key={category}>
-                      <h4 className="mb-2 text-base font-semibold text-zinc-900 dark:text-zinc-50">
-                        {category}
-                      </h4>
-                      <ul className="space-y-2">
-                        {texts.map((text, index) => (
-                          <li
-                            key={index}
-                            className="flex items-start gap-2 text-zinc-700 dark:text-zinc-300"
-                          >
-                            <span className="mt-1 text-zinc-400 dark:text-zinc-600">
-                              •
-                            </span>
-                            <span>{text}</span>
-                          </li>
-                        ))}
-                      </ul>
+              {/* RFP Upload Area */}
+              {!rfpData && (
+                <div
+                  className={`relative rounded-lg border-2 border-dashed p-8 transition-colors ${
+                    isRfpDragging
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
+                      : "border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-900"
+                  }`}
+                  onDragOver={handleRfpDragOver}
+                  onDragLeave={handleRfpDragLeave}
+                  onDrop={handleRfpDrop}
+                >
+                  <input
+                    type="file"
+                    id="rfp-upload"
+                    accept=".pdf,application/pdf"
+                    onChange={handleRfpFileInputChange}
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                    disabled={isRfpUploading}
+                  />
+                  <div className="flex flex-col items-center gap-4">
+                    <svg
+                      className="h-10 w-10 text-zinc-400 dark:text-zinc-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                      />
+                    </svg>
+                    <div className="text-center">
+                      <p className="text-base font-medium text-zinc-900 dark:text-zinc-100">
+                        {rfpFile
+                          ? rfpFile.name
+                          : "Drag and drop an RFP PDF here"}
+                      </p>
+                      <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                        or click to browse (Max 10MB)
+                      </p>
                     </div>
-                  ))}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* RFP Upload Button */}
+              {rfpFile && !isRfpUploading && (
+                <button
+                  onClick={handleRfpUpload}
+                  className="w-full rounded-lg bg-zinc-900 px-6 py-3 font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                >
+                  Process RFP
+                </button>
+              )}
+
+              {/* RFP Loading State */}
+              {isRfpUploading && (
+                <div className="flex flex-col items-center gap-4 rounded-lg bg-zinc-100 p-8 dark:bg-zinc-800">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-300 border-t-zinc-900 dark:border-zinc-600 dark:border-t-zinc-200"></div>
+                  <p className="text-zinc-600 dark:text-zinc-400">
+                    Processing PDF and extracting RFP data...
+                  </p>
+                </div>
+              )}
+
+              {/* RFP Display */}
+              {rfpData && (
+                <div className="space-y-6 rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900">
+                  <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+                    {rfpData.title}
+                  </h3>
+
+                  <div>
+                    <h4 className="text-sm font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                      Requirements
+                    </h4>
+                    <div className="mt-4 space-y-4">
+                      {Object.entries(
+                        groupRequirementsByCategory(rfpData.requirements)
+                      ).map(([category, texts]) => (
+                        <div key={category}>
+                          <h5 className="mb-2 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                            {category}
+                          </h5>
+                          <ul className="space-y-1.5">
+                            {texts.map((text, index) => (
+                              <li
+                                key={index}
+                                className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300"
+                              >
+                                <span className="mt-1.5 text-zinc-400 dark:text-zinc-600">
+                                  •
+                                </span>
+                                <span>{text}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        )}
+
+          {/* Right Column - Bids (60%) */}
+          <div className="lg:col-span-3">
+            <div className="space-y-6">
+              <h2 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+                Bids
+              </h2>
+
+              {/* Bid Upload Area */}
+              <div
+                className={`relative rounded-lg border-2 border-dashed p-8 transition-colors ${
+                  isBidDragging
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
+                    : "border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-900"
+                } ${!rfpData ? "opacity-50" : ""}`}
+                onDragOver={handleBidDragOver}
+                onDragLeave={handleBidDragLeave}
+                onDrop={handleBidDrop}
+              >
+                <input
+                  type="file"
+                  id="bid-upload"
+                  accept=".pdf,application/pdf"
+                  onChange={handleBidFileInputChange}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  disabled={isBidUploading || !rfpData}
+                />
+                <div className="flex flex-col items-center gap-4">
+                  <svg
+                    className="h-10 w-10 text-zinc-400 dark:text-zinc-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                    />
+                  </svg>
+                  <div className="text-center">
+                    <p className="text-base font-medium text-zinc-900 dark:text-zinc-100">
+                      {bidFile
+                        ? bidFile.name
+                        : !rfpData
+                          ? "Upload RFP first to enable bid upload"
+                          : "Drag and drop a bid PDF here"}
+                    </p>
+                    <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                      or click to browse (Max 10MB)
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bid Upload Button */}
+              {bidFile && !isBidUploading && rfpData && (
+                <button
+                  onClick={handleBidUpload}
+                  className="w-full rounded-lg bg-zinc-900 px-6 py-3 font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                >
+                  Process Bid
+                </button>
+              )}
+
+              {/* Bid Loading State */}
+              {isBidUploading && (
+                <div className="flex flex-col items-center gap-4 rounded-lg bg-zinc-100 p-8 dark:bg-zinc-800">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-300 border-t-zinc-900 dark:border-zinc-600 dark:border-t-zinc-200"></div>
+                  <p className="text-zinc-600 dark:text-zinc-400">
+                    Processing bid and assessing requirements...
+                  </p>
+                </div>
+              )}
+
+              {/* Bids List */}
+              {bids.length > 0 && (
+                <div className="space-y-4">
+                  {bids.map((bid, index) => {
+                    const summary = getSatisfactionSummary(bid);
+                    const isExpanded = expandedBidIndex === index;
+                    return (
+                      <div
+                        key={index}
+                        className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900"
+                      >
+                        <button
+                          onClick={() =>
+                            setExpandedBidIndex(isExpanded ? null : index)
+                          }
+                          className="w-full px-6 py-4 text-left"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                                {bid.title}
+                              </h3>
+                              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                                {summary.satisfied} of {summary.total}{" "}
+                                requirements satisfied
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`rounded-full px-3 py-1 text-sm font-medium ${
+                                  summary.satisfied === summary.total
+                                    ? "bg-green-100 text-green-800 dark:bg-green-950/20 dark:text-green-400"
+                                    : summary.satisfied / summary.total >= 0.7
+                                      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-950/20 dark:text-yellow-400"
+                                      : "bg-red-100 text-red-800 dark:bg-red-950/20 dark:text-red-400"
+                                }`}
+                              >
+                                {Math.round(
+                                  (summary.satisfied / summary.total) * 100
+                                )}
+                                %
+                              </span>
+                              <svg
+                                className={`h-5 w-5 text-zinc-400 transition-transform ${
+                                  isExpanded ? "rotate-180" : ""
+                                }`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 9l-7 7-7-7"
+                                />
+                              </svg>
+                            </div>
+                          </div>
+                        </button>
+
+                        {isExpanded && (
+                          <div className="border-t border-zinc-200 px-6 py-4 dark:border-zinc-700">
+                            <div className="space-y-6">
+                              {Object.entries(
+                                groupRequirementsByCategory(
+                                  bid.requirements.map((r) => ({
+                                    text: r.text,
+                                    category: r.category,
+                                  }))
+                                )
+                              ).map(([category, texts]) => (
+                                <div key={category}>
+                                  <h4 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-50">
+                                    {category}
+                                  </h4>
+                                  <ul className="space-y-3">
+                                    {texts.map((text, textIndex) => {
+                                      const requirement = bid.requirements.find(
+                                        (r) => r.text === text
+                                      );
+                                      if (!requirement) return null;
+                                      return (
+                                        <li
+                                          key={textIndex}
+                                          className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-700"
+                                        >
+                                          <div className="flex items-start gap-3">
+                                            <span
+                                              className={`mt-0.5 flex-shrink-0 ${
+                                                requirement.isSatisfied
+                                                  ? "text-green-600 dark:text-green-400"
+                                                  : "text-red-600 dark:text-red-400"
+                                              }`}
+                                            >
+                                              {requirement.isSatisfied ? (
+                                                <svg
+                                                  className="h-5 w-5"
+                                                  fill="currentColor"
+                                                  viewBox="0 0 20 20"
+                                                >
+                                                  <path
+                                                    fillRule="evenodd"
+                                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                                    clipRule="evenodd"
+                                                  />
+                                                </svg>
+                                              ) : (
+                                                <svg
+                                                  className="h-5 w-5"
+                                                  fill="currentColor"
+                                                  viewBox="0 0 20 20"
+                                                >
+                                                  <path
+                                                    fillRule="evenodd"
+                                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                                                    clipRule="evenodd"
+                                                  />
+                                                </svg>
+                                              )}
+                                            </span>
+                                            <div className="flex-1">
+                                              <p className="text-sm text-zinc-700 dark:text-zinc-300">
+                                                {text}
+                                              </p>
+                                              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                                {requirement.reason}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   );

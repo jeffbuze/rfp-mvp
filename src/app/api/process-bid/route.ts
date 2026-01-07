@@ -4,16 +4,22 @@ import { put, del } from "@vercel/blob";
 import { z } from "zod";
 
 const bidSchema = z.object({
-  title: z.string().describe("The title of the bid document."),
+  title: z.string().describe("The title for the bid including the company name and project name."),
   rawText: z
     .string()
     .describe("The raw text of the bid document in markdown format."),
+  totalCost: z.number().describe("The total cost of the bid."),
+  timeline: z.string().describe("The timeline for the bid."),
   requirements: z.array(
     z.object({
       text: z.string().describe("The text of the requirement."),
       category: z.string().describe("The category of the requirement."),
-      isSatisfied: z.boolean().describe("Whether the requirement is satisfied."),
-      reason: z.string().describe("The reason for the requirement being satisfied or not."),
+      isSatisfied: z
+        .boolean()
+        .describe("Whether the requirement is satisfied."),
+      reason: z
+        .string()
+        .describe("The reason for the requirement being satisfied or not."),
     })
   ),
 });
@@ -28,10 +34,7 @@ export async function POST(request: NextRequest) {
     const requirementsJson = formData.get("requirements") as string | null;
 
     if (!file) {
-      return NextResponse.json(
-        { error: "No file provided" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
     if (!requirementsJson) {

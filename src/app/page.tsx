@@ -11,6 +11,8 @@ interface RFPData {
 interface BidData {
   title: string;
   rawText: string;
+  totalCost: number;
+  timeline: string;
   requirements: Array<{
     text: string;
     category: string;
@@ -495,14 +497,26 @@ export default function Home() {
                           className="w-full px-6 py-4 text-left"
                         >
                           <div className="flex items-center justify-between">
-                            <div>
+                            <div className="flex-1">
                               <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
                                 {bid.title}
                               </h3>
-                              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                                {summary.satisfied} of {summary.total}{" "}
-                                requirements satisfied
-                              </p>
+                              <div className="mt-1 flex flex-wrap items-center gap-4 text-sm text-zinc-600 dark:text-zinc-400">
+                                <p>
+                                  {summary.satisfied} of {summary.total}{" "}
+                                  requirements satisfied
+                                </p>
+                                <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                                  Total Cost:{" "}
+                                  {new Intl.NumberFormat("en-US", {
+                                    style: "currency",
+                                    currency: "USD",
+                                  }).format(bid.totalCost)}
+                                </span>
+                                <span className="text-zinc-600 dark:text-zinc-400">
+                                  Timeline: {bid.timeline}
+                                </span>
+                              </div>
                             </div>
                             <div className="flex items-center gap-2">
                               <span
@@ -566,7 +580,7 @@ export default function Home() {
                                         >
                                           <div className="flex items-start gap-3">
                                             <span
-                                              className={`mt-0.5 flex-shrink-0 ${
+                                              className={`mt-0.5 shrink-0 ${
                                                 requirement.isSatisfied
                                                   ? "text-green-600 dark:text-green-400"
                                                   : "text-red-600 dark:text-red-400"

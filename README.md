@@ -29,7 +29,7 @@ The RFP Bid Assessment Tool streamlines the bid evaluation process by:
 - **UI Library**: React 19
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS 4
-- **AI Integration**: AI SDK with Anthropic Claude Sonnet 4.5
+- **AI Integration**: AI SDK with Anthropic Claude Sonnet 4.5 (via Vercel AI Gateway)
 - **File Storage**: Vercel Blob Storage (temporary)
 - **Validation**: Zod for schema validation
 - **Package Manager**: pnpm
@@ -80,7 +80,7 @@ Processes an RFP PDF document and extracts structured data.
 **Process:**
 1. Validates PDF file (type and 10MB size limit)
 2. Uploads file to Vercel Blob storage temporarily
-3. Uses Claude Sonnet 4.5 to extract title, raw text, and categorized requirements
+3. Uses Claude Sonnet 4.5 (via Vercel AI Gateway) to extract title, raw text, and categorized requirements
 4. Cleans up temporary blob file
 5. Returns structured RFP data
 
@@ -115,17 +115,17 @@ Processes a bid PDF document and assesses it against RFP requirements.
 **Process:**
 1. Validates PDF file and requirements JSON
 2. Uploads file to Vercel Blob storage temporarily
-3. Uses Claude Sonnet 4.5 to extract bid information and assess each requirement
+3. Uses Claude Sonnet 4.5 (via Vercel AI Gateway) to extract bid information and assess each requirement
 4. Cleans up temporary blob file
 5. Returns bid data with requirement satisfaction analysis
 
 ### Data Flow
 
 1. **RFP Processing Flow**:
-   - User uploads RFP PDF → File validated → Uploaded to Vercel Blob → Claude extracts requirements → Data returned → Blob cleaned up → Requirements displayed
+   - User uploads RFP PDF → File validated → Uploaded to Vercel Blob → Claude (via AI Gateway) extracts requirements → Data returned → Blob cleaned up → Requirements displayed
 
 2. **Bid Assessment Flow**:
-   - User uploads bid PDF → File validated → Uploaded to Vercel Blob → Claude assesses against RFP requirements → Data returned → Blob cleaned up → Bid added to comparison list
+   - User uploads bid PDF → File validated → Uploaded to Vercel Blob → Claude (via AI Gateway) assesses against RFP requirements → Data returned → Blob cleaned up → Bid added to comparison list
 
 3. **Client-Side State**:
    - RFP data and bids stored in React state
@@ -182,8 +182,8 @@ flowchart TD
 
 - Node.js 18+ 
 - pnpm (package manager)
-- Vercel account (for Blob storage)
-- Anthropic API key
+- Vercel account (for Blob storage and AI Gateway)
+- Vercel AI Gateway API key
 
 ### Installation
 
@@ -200,19 +200,25 @@ pnpm install
 
 3. Set up environment variables:
 
-Create a `.env.local` file in the root directory:
+Copy the example environment file and fill in your values:
+
+```bash
+cp example.env .env.local
+```
+
+Edit `.env.local` with your credentials:
 
 ```env
-# Vercel Blob Storage
-BLOB_READ_WRITE_TOKEN=your_vercel_blob_token
+# AI Gateway API Key (https://vercel.com/ai-gateway)
+AI_GATEWAY_API_KEY=your_ai_gateway_api_key
 
-# Anthropic API Key
-ANTHROPIC_API_KEY=your_anthropic_api_key
+# Vercel Blob Storage Token (https://vercel.com/storage/blob)
+BLOB_READ_WRITE_TOKEN=your_vercel_blob_token
 ```
 
 **Getting your tokens:**
-- **Vercel Blob Token**: Create a Vercel account, go to Storage → Blob, create a store, and copy the read/write token
-- **Anthropic API Key**: Sign up at [console.anthropic.com](https://console.anthropic.com) and create an API key
+- **Vercel AI Gateway API Key**: Create a Vercel account, go to [AI Gateway](https://vercel.com/ai-gateway), and create an API key. The AI Gateway provides access to Anthropic Claude Sonnet 4.5 model.
+- **Vercel Blob Token**: In your Vercel dashboard, go to Storage → Blob, create a store, and copy the read/write token
 
 4. Run the development server:
 ```bash
@@ -333,8 +339,8 @@ The easiest way to deploy this Next.js app is using the [Vercel Platform](https:
 1. Push your code to a Git repository
 2. Import the project in Vercel
 3. Add environment variables:
-   - `BLOB_READ_WRITE_TOKEN`
-   - `ANTHROPIC_API_KEY`
+   - `AI_GATEWAY_API_KEY` - Your Vercel AI Gateway API key
+   - `BLOB_READ_WRITE_TOKEN` - Your Vercel Blob storage token
 4. Deploy!
 
 The app will automatically use Vercel Blob storage when deployed on Vercel.
@@ -343,6 +349,7 @@ The app will automatically use Vercel Blob storage when deployed on Vercel.
 
 - [Next.js Documentation](https://nextjs.org/docs)
 - [AI SDK Documentation](https://sdk.vercel.ai/docs)
+- [Vercel AI Gateway](https://vercel.com/ai-gateway)
 - [Vercel Blob Storage](https://vercel.com/docs/storage/vercel-blob)
 - [Anthropic Claude API](https://docs.anthropic.com)
 

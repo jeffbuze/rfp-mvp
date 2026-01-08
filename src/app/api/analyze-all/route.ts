@@ -4,12 +4,17 @@ import { z } from "zod";
 
 const analysisSchema = z.object({
   recommendation: z.string().describe("The recommendation for the best bid."),
-  recommendationReason: z.string().describe("The reason for the recommendation."),
+  mainRecommendationReason: z
+    .string()
+    .describe(
+      "The main reason for the recommendation. Make is a short, max 2 sentences."
+    ),
+  supportingRecommendationPoints: z.array(z.string()).describe("The supporting points for the recommendation. Make it short, max 1-2sentences each."),
   openQuestions: z.array(
     z.object({
       companyName: z.string().describe("The name of the company."),
       openQuestions: z.array(
-        z.string().describe("The open questions to clarify the bid.")
+        z.string().describe("The open questions to clarify the bid. Short, single sentence questions.")
       ),
     })
   ),
@@ -72,7 +77,9 @@ export async function POST(request: NextRequest) {
 ${bid.requirements
   .map(
     (r: BidRequirement) =>
-      `  • [${r.category}] ${r.text} - ${r.isSatisfied ? "SATISFIED" : "NOT SATISFIED"}: ${r.reason}`
+      `  • [${r.category}] ${r.text} - ${
+        r.isSatisfied ? "SATISFIED" : "NOT SATISFIED"
+      }: ${r.reason}`
   )
   .join("\n")}`;
       })
@@ -88,7 +95,7 @@ ${bid.requirements
       messages: [
         {
           role: "user",
-          content: `Please analyze the following RFP and all submitted bids. Provide a recommendation for the best bid with clear reasoning, and generate specific open questions for each company that should be asked to clarify their proposals.
+          content: `Please analyze the following RFP and all submitted bids. Provide a recommendation for the best bid with clear reasoning, and generate specific open questions for each company that should be asked to clarify their proposals. Limit the opens questions to only the biggest deal breaker ones, no more the 4-5 questions per company.
 
 RFP Title: ${rfp.title}
 
@@ -112,9 +119,7 @@ Please provide:
     return NextResponse.json(
       {
         error:
-          error instanceof Error
-            ? error.message
-            : "Failed to analyze bids",
+          error instanceof Error ? error.message : "Failed to analyze bids",
       },
       { status: 500 }
     );

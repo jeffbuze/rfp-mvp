@@ -23,7 +23,8 @@ interface BidData {
 
 interface AnalysisData {
   recommendation: string;
-  recommendationReason: string;
+  mainRecommendationReason: string;
+  supportingRecommendationPoints: string[];
   openQuestions: Array<{
     companyName: string;
     openQuestions: string[];
@@ -737,9 +738,32 @@ export default function Home() {
                       <h4 className="mb-2 text-sm font-medium uppercase tracking-wide text-blue-700 dark:text-blue-300">
                         Reasoning
                       </h4>
-                      <p className="text-sm leading-relaxed text-blue-700 dark:text-blue-300">
-                        {analysisData.recommendationReason}
+                      <p className="mb-4 text-sm leading-relaxed text-blue-700 dark:text-blue-300">
+                        {analysisData.mainRecommendationReason}
                       </p>
+                      {analysisData.supportingRecommendationPoints &&
+                        analysisData.supportingRecommendationPoints.length > 0 && (
+                          <div>
+                            <h4 className="mb-2 text-sm font-medium uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                              Supporting Points
+                            </h4>
+                            <ul className="space-y-2">
+                              {analysisData.supportingRecommendationPoints.map(
+                                (point, index) => (
+                                  <li
+                                    key={index}
+                                    className="flex items-start gap-2 text-sm leading-relaxed text-blue-700 dark:text-blue-300"
+                                  >
+                                    <span className="mt-1 shrink-0 text-blue-600 dark:text-blue-400">
+                                      •
+                                    </span>
+                                    <span>{point}</span>
+                                  </li>
+                                )
+                              )}
+                            </ul>
+                          </div>
+                        )}
                     </div>
                   </div>
 

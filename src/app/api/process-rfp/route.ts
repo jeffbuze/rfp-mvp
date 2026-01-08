@@ -66,12 +66,12 @@ export async function POST(request: NextRequest) {
     }
 
     const { output } = await generateText({
-      model: "anthropic/claude-sonnet-4.5",
+      model: "anthropic/claude-haiku-4.5",
       output: Output.object({
         schema: rfpSchema,
       }),
       system:
-        "You are a helpful assistant that extracts the title, raw text, and requirements organized into categories from an RFP document.",
+        "You are a helpful assistant that extracts the title, raw text, and requirements organized into categories from an RFP document. Limit the number of categories to 5-6.",
       messages: [
         {
           role: "user",

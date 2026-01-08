@@ -21,6 +21,15 @@ interface BidData {
   }>;
 }
 
+interface AnalysisData {
+  recommendation: string;
+  recommendationReason: string;
+  openQuestions: Array<{
+    companyName: string;
+    openQuestions: string[];
+  }>;
+}
+
 const STORAGE_KEY = "rfp-bid-project";
 
 export default function Home() {
@@ -37,6 +46,10 @@ export default function Home() {
   const [bids, setBids] = useState<BidData[]>([]);
   const [expandedBidIndex, setExpandedBidIndex] = useState<number | null>(null);
 
+  // Analysis state
+  const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
   // Error state
   const [error, setError] = useState<string | null>(null);
 
@@ -52,6 +65,7 @@ export default function Home() {
         const data = JSON.parse(stored);
         if (data.rfpData) setRfpData(data.rfpData);
         if (data.bids) setBids(data.bids);
+        if (data.analysisData) setAnalysisData(data.analysisData);
       } catch (err) {
         console.error("Failed to load stored data:", err);
       }
@@ -60,13 +74,13 @@ export default function Home() {
 
   // Save to localStorage when data changes
   useEffect(() => {
-    if (rfpData || bids.length > 0) {
+    if (rfpData || bids.length > 0 || analysisData) {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ rfpData, bids })
+        JSON.stringify({ rfpData, bids, analysisData })
       );
     }
-  }, [rfpData, bids]);
+  }, [rfpData, bids, analysisData]);
 
   const validateFile = (fileToValidate: File): string | null => {
     if (fileToValidate.type !== "application/pdf") {
@@ -85,6 +99,7 @@ export default function Home() {
     setBidFile(null);
     setBids([]);
     setExpandedBidIndex(null);
+    setAnalysisData(null);
     setError(null);
     localStorage.removeItem(STORAGE_KEY);
   };
@@ -263,6 +278,41 @@ export default function Home() {
       handleBidUpload();
     }
   }, [bidFile, rfpData, isBidUploading, handleBidUpload]);
+
+  // Analysis handler
+  const handleAnalyzeAll = useCallback(async () => {
+    if (!rfpData || bids.length === 0) {
+      setError("Please upload an RFP and at least one bid before analyzing");
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/analyze-all", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ rfp: rfpData, bids }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to analyze bids");
+      }
+
+      const data = await response.json();
+      setAnalysisData(data.output);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "An unexpected error occurred"
+      );
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [rfpData, bids]);
 
   const groupRequirementsByCategory = (
     requirements: Array<{ text: string; category: string }>
@@ -641,6 +691,89 @@ export default function Home() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {/* Analyze All Button */}
+              {rfpData && bids.length > 0 && (
+                <div className="mt-6">
+                  <button
+                    onClick={handleAnalyzeAll}
+                    disabled={isAnalyzing}
+                    className={`w-full rounded-lg px-6 py-3 font-medium text-white transition-colors ${
+                      isAnalyzing
+                        ? "cursor-not-allowed bg-zinc-400 dark:bg-zinc-600"
+                        : "bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                    }`}
+                  >
+                    {isAnalyzing ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                        Analyzing bids...
+                      </span>
+                    ) : (
+                      "Analyze All Bids"
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* Analysis Results */}
+              {analysisData && (
+                <div className="mt-6 space-y-6">
+                  <h2 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+                    Analysis Results
+                  </h2>
+
+                  {/* Recommendation Card */}
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-6 dark:border-blue-800 dark:bg-blue-950/20">
+                    <h3 className="mb-2 text-lg font-semibold text-blue-900 dark:text-blue-100">
+                      Recommendation
+                    </h3>
+                    <p className="mb-4 text-base font-medium text-blue-800 dark:text-blue-200">
+                      {analysisData.recommendation}
+                    </p>
+                    <div>
+                      <h4 className="mb-2 text-sm font-medium uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                        Reasoning
+                      </h4>
+                      <p className="text-sm leading-relaxed text-blue-700 dark:text-blue-300">
+                        {analysisData.recommendationReason}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Open Questions */}
+                  {analysisData.openQuestions.length > 0 && (
+                    <div className="space-y-4">
+                      <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+                        Open Questions
+                      </h3>
+                      {analysisData.openQuestions.map((company, index) => (
+                        <div
+                          key={index}
+                          className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900"
+                        >
+                          <h4 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                            {company.companyName}
+                          </h4>
+                          <ul className="space-y-3">
+                            {company.openQuestions.map((question, qIndex) => (
+                              <li
+                                key={qIndex}
+                                className="flex items-start gap-3 text-sm text-zinc-700 dark:text-zinc-300"
+                              >
+                                <span className="mt-1 shrink-0 text-zinc-400 dark:text-zinc-600">
+                                  •
+                                </span>
+                                <span>{question}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

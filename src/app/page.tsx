@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
 interface RFPData {
   title: string;
@@ -39,6 +39,10 @@ export default function Home() {
 
   // Error state
   const [error, setError] = useState<string | null>(null);
+
+  // Refs for file inputs to clear them after processing
+  const rfpFileInputRef = useRef<HTMLInputElement>(null);
+  const bidFileInputRef = useRef<HTMLInputElement>(null);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -129,7 +133,7 @@ export default function Home() {
     [handleRfpFileSelect]
   );
 
-  const handleRfpUpload = async () => {
+  const handleRfpUpload = useCallback(async () => {
     if (!rfpFile) return;
 
     setIsRfpUploading(true);
@@ -152,6 +156,10 @@ export default function Home() {
       const data = await response.json();
       setRfpData(data.output);
       setRfpFile(null);
+      // Clear the file input
+      if (rfpFileInputRef.current) {
+        rfpFileInputRef.current.value = "";
+      }
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "An unexpected error occurred"
@@ -159,7 +167,14 @@ export default function Home() {
     } finally {
       setIsRfpUploading(false);
     }
-  };
+  }, [rfpFile]);
+
+  // Auto-trigger RFP processing when file is selected
+  useEffect(() => {
+    if (rfpFile && !isRfpUploading) {
+      handleRfpUpload();
+    }
+  }, [rfpFile, isRfpUploading, handleRfpUpload]);
 
   // Bid handlers
   const handleBidFileSelect = useCallback((selectedFile: File) => {
@@ -205,7 +220,7 @@ export default function Home() {
     [handleBidFileSelect]
   );
 
-  const handleBidUpload = async () => {
+  const handleBidUpload = useCallback(async () => {
     if (!bidFile || !rfpData) return;
 
     setIsBidUploading(true);
@@ -229,6 +244,10 @@ export default function Home() {
       const data = await response.json();
       setBids((prev) => [...prev, data.output]);
       setBidFile(null);
+      // Clear the file input
+      if (bidFileInputRef.current) {
+        bidFileInputRef.current.value = "";
+      }
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "An unexpected error occurred"
@@ -236,7 +255,14 @@ export default function Home() {
     } finally {
       setIsBidUploading(false);
     }
-  };
+  }, [bidFile, rfpData]);
+
+  // Auto-trigger bid processing when file is selected
+  useEffect(() => {
+    if (bidFile && rfpData && !isBidUploading) {
+      handleBidUpload();
+    }
+  }, [bidFile, rfpData, isBidUploading, handleBidUpload]);
 
   const groupRequirementsByCategory = (
     requirements: Array<{ text: string; category: string }>
@@ -308,6 +334,7 @@ export default function Home() {
                   onDrop={handleRfpDrop}
                 >
                   <input
+                    ref={rfpFileInputRef}
                     type="file"
                     id="rfp-upload"
                     accept=".pdf,application/pdf"
@@ -341,16 +368,6 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-              )}
-
-              {/* RFP Upload Button */}
-              {rfpFile && !isRfpUploading && (
-                <button
-                  onClick={handleRfpUpload}
-                  className="w-full rounded-lg bg-zinc-900 px-6 py-3 font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
-                >
-                  Process RFP
-                </button>
               )}
 
               {/* RFP Loading State */}
@@ -423,6 +440,7 @@ export default function Home() {
                 onDrop={handleBidDrop}
               >
                 <input
+                  ref={bidFileInputRef}
                   type="file"
                   id="bid-upload"
                   accept=".pdf,application/pdf"
@@ -458,16 +476,6 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-
-              {/* Bid Upload Button */}
-              {bidFile && !isBidUploading && rfpData && (
-                <button
-                  onClick={handleBidUpload}
-                  className="w-full rounded-lg bg-zinc-900 px-6 py-3 font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
-                >
-                  Process Bid
-                </button>
-              )}
 
               {/* Bid Loading State */}
               {isBidUploading && (

@@ -15,17 +15,15 @@ The RFP Bid Assessment Tool streamlines the bid evaluation process by:
 ## Features
 
 - 📄 **PDF Upload**: Drag-and-drop or file picker interface for uploading RFP and bid documents
-- 🤖 **AI-Powered Extraction**: Automatic requirement extraction and categorization using Claude Haiku 4.5 (not Sonnet)
+- 🤖 **AI-Powered Extraction**: Automatic requirement extraction and categorization using Claude Haiku 4.5
 - ✅ **Requirement Assessment**: Each bid is evaluated against all RFP requirements with satisfaction status
 - 📊 **Visual Scoring**: Color-coded satisfaction percentages (green/yellow/red) for quick comparison
 - 📋 **Detailed Analysis**: Expandable bid cards showing requirement-by-requirement assessment with reasoning
 - 🎯 **Comprehensive Bid Analysis**: Analyze all bids together to get recommendations, reasoning, and open questions per company
 - ❓ **Open Questions Generation**: Automatically generates specific questions for each bidder to clarify gaps or ambiguities
 - 💾 **Local Persistence**: Project data (RFP, bids, and analysis) automatically saved to browser localStorage
-- 🌙 **Dark Mode**: Full dark mode support for comfortable viewing
 - 🔄 **Multiple Bids**: Upload and compare multiple bids against the same RFP
 - 🆕 **Project Management**: Easy project reset to start fresh assessments
-- ⚡ **Auto-Processing**: Files are automatically processed when selected (no manual upload button needed)
 
 ## Tech Stack
 
@@ -33,7 +31,7 @@ The RFP Bid Assessment Tool streamlines the bid evaluation process by:
 - **UI Library**: React 19
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS 4
-- **AI Integration**: AI SDK with Anthropic Claude Haiku 4.5 (via Vercel AI Gateway) - Note: This uses Claude Haiku 4.5, not Sonnet
+- **AI Integration**: AI SDK with Anthropic Claude Haiku 4.5 (via Vercel AI Gateway)
 - **File Storage**: Vercel Blob Storage (temporary)
 - **Validation**: Zod for schema validation
 - **Package Manager**: pnpm
@@ -265,7 +263,7 @@ BLOB_READ_WRITE_TOKEN=your_vercel_blob_token
 ```
 
 **Getting your tokens:**
-- **Vercel AI Gateway API Key**: Create a Vercel account, go to [AI Gateway](https://vercel.com/ai-gateway), and create an API key. The AI Gateway provides access to Anthropic Claude Haiku 4.5 model (not Sonnet).
+- **Vercel AI Gateway API Key**: Create a Vercel account, go to [AI Gateway](https://vercel.com/ai-gateway), and create an API key. The AI Gateway provides access to Anthropic Claude Haiku 4.5 model.
 - **Vercel Blob Token**: In your Vercel dashboard, go to Storage → Blob, create a store, and copy the read/write token
 
 4. Run the development server:

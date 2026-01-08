@@ -10,18 +10,22 @@ The RFP Bid Assessment Tool streamlines the bid evaluation process by:
 - **Assessing bid compliance** by analyzing bid documents against RFP requirements
 - **Providing detailed scoring** with satisfaction percentages and requirement-by-requirement analysis
 - **Enabling side-by-side comparison** of multiple bids with expandable detail views
+- **Generating comprehensive analysis** with recommendations, reasoning, and open questions for each bidder
 
 ## Features
 
 - 📄 **PDF Upload**: Drag-and-drop or file picker interface for uploading RFP and bid documents
-- 🤖 **AI-Powered Extraction**: Automatic requirement extraction and categorization using Claude Sonnet 4.5
+- 🤖 **AI-Powered Extraction**: Automatic requirement extraction and categorization using Claude Haiku 4.5 (not Sonnet)
 - ✅ **Requirement Assessment**: Each bid is evaluated against all RFP requirements with satisfaction status
 - 📊 **Visual Scoring**: Color-coded satisfaction percentages (green/yellow/red) for quick comparison
 - 📋 **Detailed Analysis**: Expandable bid cards showing requirement-by-requirement assessment with reasoning
-- 💾 **Local Persistence**: Project data automatically saved to browser localStorage
+- 🎯 **Comprehensive Bid Analysis**: Analyze all bids together to get recommendations, reasoning, and open questions per company
+- ❓ **Open Questions Generation**: Automatically generates specific questions for each bidder to clarify gaps or ambiguities
+- 💾 **Local Persistence**: Project data (RFP, bids, and analysis) automatically saved to browser localStorage
 - 🌙 **Dark Mode**: Full dark mode support for comfortable viewing
 - 🔄 **Multiple Bids**: Upload and compare multiple bids against the same RFP
 - 🆕 **Project Management**: Easy project reset to start fresh assessments
+- ⚡ **Auto-Processing**: Files are automatically processed when selected (no manual upload button needed)
 
 ## Tech Stack
 
@@ -29,7 +33,7 @@ The RFP Bid Assessment Tool streamlines the bid evaluation process by:
 - **UI Library**: React 19
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS 4
-- **AI Integration**: AI SDK with Anthropic Claude Sonnet 4.5 (via Vercel AI Gateway)
+- **AI Integration**: AI SDK with Anthropic Claude Haiku 4.5 (via Vercel AI Gateway) - Note: This uses Claude Haiku 4.5, not Sonnet
 - **File Storage**: Vercel Blob Storage (temporary)
 - **Validation**: Zod for schema validation
 - **Package Manager**: pnpm
@@ -46,8 +50,10 @@ src/
 │   ├── api/
 │   │   ├── process-rfp/
 │   │   │   └── route.ts      # RFP processing endpoint
-│   │   └── process-bid/
-│   │       └── route.ts      # Bid assessment endpoint
+│   │   ├── process-bid/
+│   │   │   └── route.ts      # Bid assessment endpoint
+│   │   └── analyze-all/
+│   │       └── route.ts      # Comprehensive bid analysis endpoint
 │   ├── page.tsx              # Main application UI
 │   ├── layout.tsx             # Root layout
 │   └── globals.css           # Global styles
@@ -80,7 +86,7 @@ Processes an RFP PDF document and extracts structured data.
 **Process:**
 1. Validates PDF file (type and 10MB size limit)
 2. Uploads file to Vercel Blob storage temporarily
-3. Uses Claude Sonnet 4.5 (via Vercel AI Gateway) to extract title, raw text, and categorized requirements
+3. Uses Claude Haiku 4.5 (via Vercel AI Gateway) to extract title, raw text, and categorized requirements
 4. Cleans up temporary blob file
 5. Returns structured RFP data
 
@@ -115,21 +121,56 @@ Processes a bid PDF document and assesses it against RFP requirements.
 **Process:**
 1. Validates PDF file and requirements JSON
 2. Uploads file to Vercel Blob storage temporarily
-3. Uses Claude Sonnet 4.5 (via Vercel AI Gateway) to extract bid information and assess each requirement
+3. Uses Claude Haiku 4.5 (via Vercel AI Gateway) to extract bid information and assess each requirement
 4. Cleans up temporary blob file
 5. Returns bid data with requirement satisfaction analysis
+
+#### `/api/analyze-all` (POST)
+
+Performs comprehensive analysis of all submitted bids against the RFP to provide recommendations and identify open questions.
+
+**Request:**
+- Method: `POST`
+- Body: JSON object with:
+  - `rfp`: RFP data object (title, rawText, requirements array)
+  - `bids`: Array of bid data objects
+
+**Response:**
+```typescript
+{
+  output: {
+    recommendation: string;
+    mainRecommendationReason: string;
+    supportingRecommendationPoints: string[];
+    openQuestions: Array<{
+      companyName: string;
+      openQuestions: string[];
+    }>;
+  }
+}
+```
+
+**Process:**
+1. Validates RFP data and bids array
+2. Uses Claude Haiku 4.5 (via Vercel AI Gateway) to analyze all bids comprehensively
+3. Generates recommendation for best bid with detailed reasoning
+4. Identifies specific open questions for each company (4-5 deal-breaker questions per company)
+5. Returns analysis results with recommendation and open questions
 
 ### Data Flow
 
 1. **RFP Processing Flow**:
-   - User uploads RFP PDF → File validated → Uploaded to Vercel Blob → Claude (via AI Gateway) extracts requirements → Data returned → Blob cleaned up → Requirements displayed
+   - User uploads RFP PDF → File validated → Uploaded to Vercel Blob → Claude Haiku 4.5 (via AI Gateway) extracts requirements → Data returned → Blob cleaned up → Requirements displayed
 
 2. **Bid Assessment Flow**:
-   - User uploads bid PDF → File validated → Uploaded to Vercel Blob → Claude (via AI Gateway) assesses against RFP requirements → Data returned → Blob cleaned up → Bid added to comparison list
+   - User uploads bid PDF → File validated → Uploaded to Vercel Blob → Claude Haiku 4.5 (via AI Gateway) assesses against RFP requirements → Data returned → Blob cleaned up → Bid added to comparison list
 
-3. **Client-Side State**:
-   - RFP data and bids stored in React state
-   - Automatically persisted to localStorage
+3. **Analysis Flow**:
+   - User clicks "Analyze All Bids" → RFP data and all bids sent to API → Claude Haiku 4.5 (via AI Gateway) analyzes all bids comprehensively → Recommendation, reasoning, and open questions returned → Analysis results displayed
+
+4. **Client-Side State**:
+   - RFP data, bids, and analysis results stored in React state
+   - Automatically persisted to localStorage (including analysis data)
    - Restored on page reload
 
 ## User Flows
@@ -154,7 +195,10 @@ flowchart TD
     AssessReq --> DisplayBid[Display Bid Assessment]
     DisplayBid --> MoreBids{More Bids?}
     MoreBids -->|Yes| UploadBid
-    MoreBids -->|No| Compare[Compare All Bids]
+    MoreBids -->|No| AnalyzeAll[Analyze All Bids]
+    AnalyzeAll --> GenerateAnalysis[Generate Recommendations]
+    GenerateAnalysis --> DisplayAnalysis[Display Analysis Results]
+    DisplayAnalysis --> Compare[Compare All Bids]
     Compare --> Expand[Expand Bid Details]
     Expand --> Review[Review Requirement Analysis]
     Review --> NewProject{New Project?}
@@ -165,16 +209,20 @@ flowchart TD
 
 ### Key User Actions
 
-1. **Upload RFP**: Drag-and-drop or click to upload RFP PDF (max 10MB)
+1. **Upload RFP**: Drag-and-drop or click to upload RFP PDF (max 10MB) - automatically processes when selected
 2. **View Requirements**: Automatically extracted requirements displayed by category
-3. **Upload Bids**: Upload multiple bid PDFs (one at a time)
+3. **Upload Bids**: Upload multiple bid PDFs (one at a time) - automatically processes when selected
 4. **Review Assessments**: Each bid shows:
    - Satisfaction percentage
    - Total cost
    - Timeline
    - Requirement-by-requirement analysis
-5. **Compare Bids**: Side-by-side comparison with expandable detail views
-6. **Start New Project**: Reset button clears all data and starts fresh
+5. **Analyze All Bids**: Click "Analyze All Bids" button to get:
+   - Recommendation for best bid
+   - Detailed reasoning and supporting points
+   - Open questions for each company (4-5 deal-breaker questions)
+6. **Compare Bids**: Side-by-side comparison with expandable detail views
+7. **Start New Project**: Reset button clears all data (RFP, bids, and analysis) and starts fresh
 
 ## Getting Started
 
@@ -217,7 +265,7 @@ BLOB_READ_WRITE_TOKEN=your_vercel_blob_token
 ```
 
 **Getting your tokens:**
-- **Vercel AI Gateway API Key**: Create a Vercel account, go to [AI Gateway](https://vercel.com/ai-gateway), and create an API key. The AI Gateway provides access to Anthropic Claude Sonnet 4.5 model.
+- **Vercel AI Gateway API Key**: Create a Vercel account, go to [AI Gateway](https://vercel.com/ai-gateway), and create an API key. The AI Gateway provides access to Anthropic Claude Haiku 4.5 model (not Sonnet).
 - **Vercel Blob Token**: In your Vercel dashboard, go to Storage → Blob, create a store, and copy the read/write token
 
 4. Run the development server:
@@ -242,7 +290,8 @@ rfp-mvp/
 │   └── app/
 │       ├── api/
 │       │   ├── process-rfp/      # RFP processing API route
-│       │   └── process-bid/      # Bid assessment API route
+│       │   ├── process-bid/      # Bid assessment API route
+│       │   └── analyze-all/      # Comprehensive bid analysis API route
 │       ├── page.tsx              # Main application page (client component)
 │       ├── layout.tsx            # Root layout with fonts
 │       └── globals.css           # Global Tailwind styles
@@ -314,6 +363,49 @@ Assesses a bid document against RFP requirements.
 **Error Responses:**
 - `400`: Invalid file type, file too large, missing requirements, or invalid JSON
 - `500`: Processing error
+
+### POST /api/analyze-all
+
+Performs comprehensive analysis of all submitted bids against the RFP to provide recommendations and identify open questions.
+
+**Request Body:**
+- `rfp` (object): RFP data containing:
+  - `title` (string): RFP title
+  - `rawText` (string): Full RFP text
+  - `requirements` (array): Array of requirement objects with `text` and `category`
+- `bids` (array): Array of bid objects, each containing:
+  - `title` (string): Bid title
+  - `totalCost` (number): Total cost
+  - `timeline` (string): Project timeline
+  - `requirements` (array): Array of assessed requirements with satisfaction status
+
+**Success Response (200):**
+```json
+{
+  "output": {
+    "recommendation": "Recommend Bid A - Company XYZ",
+    "mainRecommendationReason": "Bid A offers the best balance of cost, timeline, and requirement satisfaction...",
+    "supportingRecommendationPoints": [
+      "Highest requirement satisfaction rate at 95%",
+      "Competitive pricing within budget constraints",
+      "Realistic timeline that aligns with project needs"
+    ],
+    "openQuestions": [
+      {
+        "companyName": "Company XYZ",
+        "openQuestions": [
+          "Can you clarify the implementation timeline for Phase 2?",
+          "What is the escalation process for support requests?"
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Error Responses:**
+- `400`: Missing RFP data, missing bids array, or empty bids array
+- `500`: Analysis error
 
 ## Development
 
